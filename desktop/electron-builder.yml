@@ -17,6 +17,7 @@ asarUnpack:
 
 win:
   executableName: NanoKVM-USB
+  icon: build/icon.ico
 
 nsis:
   oneClick: false                            # show installer wizard
@@ -30,6 +31,7 @@ nsis:
   createStartMenuShortcut: true
 
 mac:
+  icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     NSCameraUsageDescription: Application requests access to the device's camera.
@@ -45,6 +47,7 @@ dmg:
   sign: true
 
 linux:
+  icon: build/icon.png
   target:
     - AppImage
     - snap

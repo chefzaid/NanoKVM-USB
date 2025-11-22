@@ -6,7 +6,6 @@ import { KeyboardCodes } from '@renderer/libs/keyboard'
 export const Keyboard = (): ReactElement => {
   const modifierKeys = new Set(['Control', 'Shift', 'Alt', 'Meta'])
 
-  const lastKeyRef = useRef<KeyboardEvent>()
   const pressedKeysRef = useRef<Set<string>>(new Set())
 
   // listen keyboard events
@@ -16,13 +15,19 @@ export const Keyboard = (): ReactElement => {
 
     // press button
     async function handleKeyDown(event: KeyboardEvent): Promise<void> {
+      // Only intercept keyboard events when not typing in input fields
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
       event.preventDefault()
       event.stopPropagation()
 
-      lastKeyRef.current = event
-
       if (modifierKeys.has(event.key)) {
         pressedKeysRef.current.add(event.code)
+        // Send modifier key immediately so it's active for mouse clicks
+        await sendModifiersOnly()
         return
       }
 
@@ -31,14 +36,17 @@ export const Keyboard = (): ReactElement => {
 
     // release button
     async function handleKeyUp(event: KeyboardEvent): Promise<void> {
+      // Only intercept keyboard events when not typing in input fields
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
       event.preventDefault()
       event.stopPropagation()
 
-      if (modifierKeys.has(event.key) && lastKeyRef.current?.code === event.code) {
-        await sendKeyDown(lastKeyRef.current)
-
-        lastKeyRef.current = undefined
-        pressedKeysRef.current.clear()
+      if (modifierKeys.has(event.key)) {
+        pressedKeysRef.current.delete(event.code)
       }
 
       await send(0, 0x00)
@@ -59,8 +67,28 @@ export const Keyboard = (): ReactElement => {
     await send(modifier, code)
   }
 
+  async function sendModifiersOnly(): Promise<void> {
+    const modifier = getCurrentModifier()
+    await send(modifier, 0x00)
+  }
+
   async function send(modifier: number, key: number): Promise<void> {
     await window.electron.ipcRenderer.invoke(IpcEvents.SEND_KEYBOARD, modifier, key)
+  }
+
+  function getCurrentModifier(): number {
+    const pressedKeys = [
+      pressedKeysRef.current.has('ControlLeft'),
+      pressedKeysRef.current.has('ShiftLeft'),
+      pressedKeysRef.current.has('AltLeft'),
+      pressedKeysRef.current.has('MetaLeft'),
+      pressedKeysRef.current.has('ControlRight'),
+      pressedKeysRef.current.has('ShiftRight'),
+      pressedKeysRef.current.has('AltRight'),
+      pressedKeysRef.current.has('MetaRight')
+    ]
+
+    return pressedKeys.reduce((acc, isPressed, bit) => (isPressed ? acc | (1 << bit) : acc), 0)
   }
 
   function getModifier(e: KeyboardEvent): number {

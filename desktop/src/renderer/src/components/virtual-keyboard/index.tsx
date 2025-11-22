@@ -17,6 +17,7 @@ import {
   keyboardArrowsOptions,
   keyboardControlPadOptions,
   keyboardOptions,
+  keyboardOptionsAzerty,
   modifierKeys,
   specialKeyMap
 } from './keys'
@@ -29,8 +30,12 @@ export const VirtualKeyboard = ({ isBigScreen }: KeyboardProps): ReactElement =>
   const [isKeyboardOpen, setIsKeyboardOpen] = useAtom(isKeyboardOpenAtom)
 
   const [activeModifierKeys, setActiveModifierKeys] = useState<string[]>([])
+  const [layoutName, setLayoutName] = useState<'default' | 'azerty'>('azerty')
 
   const keyboardRef = useRef(null)
+
+  // Determine which keyboard options to use based on layout
+  const currentKeyboardOptions = layoutName === 'azerty' ? keyboardOptionsAzerty : keyboardOptions
 
   async function onKeyPress(key: string): Promise<void> {
     if (modifierKeys.includes(key)) {
@@ -113,7 +118,31 @@ export const VirtualKeyboard = ({ isBigScreen }: KeyboardProps): ReactElement =>
           )}
         >
           {/* header */}
-          <div className="flex justify-end px-3 py-1">
+          <div className="flex justify-between items-center px-3 py-1">
+            <div className="flex gap-2">
+              <button
+                className={clsx(
+                  'px-2 py-1 text-xs rounded',
+                  layoutName === 'azerty'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                )}
+                onClick={() => setLayoutName('azerty')}
+              >
+                AZERTY
+              </button>
+              <button
+                className={clsx(
+                  'px-2 py-1 text-xs rounded',
+                  layoutName === 'default'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                )}
+                onClick={() => setLayoutName('default')}
+              >
+                QWERTY
+              </button>
+            </div>
             <div
               className="flex h-[20px] w-[20px] cursor-pointer items-center justify-center rounded text-neutral-600 hover:bg-neutral-300 hover:text-white"
               onClick={() => setIsKeyboardOpen(false)}
@@ -125,12 +154,13 @@ export const VirtualKeyboard = ({ isBigScreen }: KeyboardProps): ReactElement =>
           <div data-vaul-no-drag className="keyboardContainer w-full">
             {/* main keyboard */}
             <Keyboard
+              key={layoutName}
               buttonTheme={getButtonTheme()}
               keyboardRef={(r) => (keyboardRef.current = r)}
               onKeyPress={onKeyPress}
               onKeyReleased={onKeyReleased}
               layoutName="default"
-              {...keyboardOptions}
+              {...currentKeyboardOptions}
             />
 
             {/* control keyboard */}

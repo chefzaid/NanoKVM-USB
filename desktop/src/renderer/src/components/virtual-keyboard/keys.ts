@@ -88,6 +88,94 @@ export const keyboardOptions = {
     '{winright}': 'Win',
     '{altright}': 'Alt',
     '{menu}': 'Menu',
+    '{controlright}': 'Ctrl',
+    IntlBackslash: '|<br>\\'
+  }
+}
+
+// AZERTY-specific display (French layout)
+export const keyboardOptionsAzerty = {
+  theme: 'simple-keyboard hg-theme-default',
+  baseClass: 'simple-keyboard-main',
+  layout: {
+    default: [
+      '{escape} F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12',
+      'Backquote Digit1 Digit2 Digit3 Digit4 Digit5 Digit6 Digit7 Digit8 Digit9 Digit0 Minus Equal {backspace}',
+      '{tab} KeyQ KeyW KeyE KeyR KeyT KeyY KeyU KeyI KeyO KeyP BracketLeft BracketRight Backslash',
+      '{capslock} KeyA KeyS KeyD KeyF KeyG KeyH KeyJ KeyK KeyL Semicolon Quote {enter}',
+      '{shiftleft} IntlBackslash KeyZ KeyX KeyC KeyV KeyB KeyN KeyM Comma Period Slash {shiftright}',
+      '{controlleft} {winleft} {altleft} {space} {altright} {winright} {menu} {controlright}'
+    ]
+  },
+  display: {
+    '{escape}': 'Esc',
+    Backquote: '²',
+    Digit1: '&<br/>1',
+    Digit2: 'é<br/>2',
+    Digit3: '"<br/>3',
+    Digit4: '\'<br/>4',
+    Digit5: '(<br/>5',
+    Digit6: '-<br/>6',
+    Digit7: 'è<br/>7',
+    Digit8: '_<br/>8',
+    Digit9: 'ç<br/>9',
+    Digit0: 'à<br/>0',
+    Minus: ')<br/>°',
+    Equal: '+<br/>=',
+    '{backspace}': 'Backspace',
+
+    '{tab}': 'Tab',
+    KeyQ: 'A',
+    KeyW: 'Z',
+    KeyE: 'E',
+    KeyR: 'R',
+    KeyT: 'T',
+    KeyY: 'Y',
+    KeyU: 'U',
+    KeyI: 'I',
+    KeyO: 'O',
+    KeyP: 'P',
+    BracketLeft: '¨<br/>^',
+    BracketRight: '£<br/>$',
+    Backslash: 'µ<br/>*',
+
+    '{capslock}': 'Caps',
+    KeyA: 'Q',
+    KeyS: 'S',
+    KeyD: 'D',
+    KeyF: 'F',
+    KeyG: 'G',
+    KeyH: 'H',
+    KeyJ: 'J',
+    KeyK: 'K',
+    KeyL: 'L',
+    Semicolon: 'M',
+    Quote: '%<br/>ù',
+    '{enter}': 'Enter',
+
+    '{shiftleft}': 'Shift',
+    IntlBackslash: '><br/><',
+    KeyZ: 'W',
+    KeyX: 'X',
+    KeyC: 'C',
+    KeyV: 'V',
+    KeyB: 'B',
+    KeyN: 'N',
+    KeyM: ',',
+    Comma: '?<br/>,',
+    Period: '/<br/>:',
+    Slash: '§<br/>!',
+    '{shiftright}': 'Shift',
+
+    '{controlleft}': 'Ctrl',
+    '{altleft}': 'Alt',
+    '{metaleft}': 'Cmd',
+    '{winleft}': 'Win',
+    '{space}': 'Space',
+    '{metaright}': 'Cmd',
+    '{winright}': 'Win',
+    '{altright}': 'AltGr',
+    '{menu}': 'Menu',
     '{controlright}': 'Ctrl'
   }
 }
@@ -195,5 +283,6 @@ export const doubleKeys = [
   'Quote',
   'Comma',
   'Period',
-  'Slash'
+  'Slash',
+  'IntlBackslash'
 ]

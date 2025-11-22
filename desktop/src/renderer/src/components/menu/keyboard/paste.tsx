@@ -3,7 +3,7 @@ import { ClipboardIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { IpcEvents } from '@common/ipc-events'
-import { CharCodes, ShiftChars } from '@renderer/libs/keyboard'
+import { CharCodes, ShiftChars, AltGrChars } from '@renderer/libs/keyboard'
 
 export const Paste = (): ReactElement => {
   const { t } = useTranslation()
@@ -15,21 +15,49 @@ export const Paste = (): ReactElement => {
 
     try {
       const text = await navigator.clipboard.readText()
-      if (!text) return
+      if (!text) {
+        console.log('No text in clipboard')
+        return
+      }
+
+      console.log('Pasting text:', text)
 
       for (const char of text) {
         const ascii = char.charCodeAt(0)
 
-        const code = CharCodes.get(ascii)
-        if (!code) continue
+        // Skip carriage return (CR) to avoid double line breaks on Windows (\r\n)
+        // Only process line feed (LF) which will be converted to Enter
+        if (ascii === 13) {
+          continue
+        }
 
-        const modifier = (ascii >= 65 && ascii <= 90) || ShiftChars.has(ascii) ? 2 : 0
+        const code = CharCodes.get(ascii)
+        if (!code) {
+          console.log(`Skipping unsupported character: "${char}" (ASCII: ${ascii})`)
+          continue
+        }
+
+        // Determine modifier based on character
+        let modifier = 0
+        if (AltGrChars.has(ascii)) {
+          // AltGr = rightAlt (bit 6) = 64
+          // Some systems need Ctrl+Alt for AltGr, so we use: leftCtrl (bit 0) + rightAlt (bit 6) = 1 + 64 = 65
+          modifier = 65
+        } else if ((ascii >= 65 && ascii <= 90) || ShiftChars.has(ascii)) {
+          // Shift = leftShift (bit 1) = 2
+          modifier = 2
+        }
+
+        // Press key with modifier
         await send(modifier, code)
 
+        // Release key immediately (no delay needed - the serial communication is already slow enough)
         await send(0, 0)
       }
+
+      console.log('Paste completed')
     } catch (e) {
-      console.log(e)
+      console.error('Paste error:', e)
     } finally {
       setIsLoading(false)
     }

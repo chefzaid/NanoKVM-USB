@@ -7,7 +7,6 @@ import { KeyboardCodes } from '@/libs/keyboard';
 export const Keyboard = () => {
   const controlKeys = new Set(['Control', 'Shift', 'Alt', 'Meta']);
 
-  const lastKeyRef = useRef<KeyboardEvent>();
   const pressedKeysRef = useRef<Set<string>>(new Set());
 
   // listen keyboard events
@@ -23,13 +22,19 @@ export const Keyboard = () => {
 
   // press button
   async function handleKeyDown(event: KeyboardEvent) {
+    // Only intercept keyboard events when not typing in input fields
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 
-    lastKeyRef.current = event;
-
     if (controlKeys.has(event.key)) {
       pressedKeysRef.current.add(event.code);
+      // Send modifier key immediately so it's active for mouse clicks
+      await sendModifiersOnly();
       return;
     }
 
@@ -38,14 +43,17 @@ export const Keyboard = () => {
 
   // release button
   async function handleKeyUp(event: KeyboardEvent) {
+    // Only intercept keyboard events when not typing in input fields
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 
-    if (controlKeys.has(event.key) && lastKeyRef.current?.code === event.code) {
-      await sendKeyDown(lastKeyRef.current);
-
-      lastKeyRef.current = undefined;
-      pressedKeysRef.current.clear();
+    if (controlKeys.has(event.key)) {
+      pressedKeysRef.current.delete(event.code);
     }
 
     await sendKeyUp();
@@ -61,10 +69,47 @@ export const Keyboard = () => {
     await device.sendKeyboardData(ctrl, keys);
   }
 
+  async function sendModifiersOnly() {
+    const modifiers = getCurrentModifiers();
+    const keys = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    await device.sendKeyboardData(modifiers, keys);
+  }
+
   async function sendKeyUp() {
     const modifiers = new Modifiers();
     const keys = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
     await device.sendKeyboardData(modifiers, keys);
+  }
+
+  function getCurrentModifiers() {
+    const modifiers = new Modifiers();
+
+    if (pressedKeysRef.current.has('ControlLeft')) {
+      modifiers.leftCtrl = true;
+    }
+    if (pressedKeysRef.current.has('ControlRight')) {
+      modifiers.rightCtrl = true;
+    }
+    if (pressedKeysRef.current.has('ShiftLeft')) {
+      modifiers.leftShift = true;
+    }
+    if (pressedKeysRef.current.has('ShiftRight')) {
+      modifiers.rightShift = true;
+    }
+    if (pressedKeysRef.current.has('AltLeft')) {
+      modifiers.leftAlt = true;
+    }
+    if (pressedKeysRef.current.has('AltRight')) {
+      modifiers.rightAlt = true;
+    }
+    if (pressedKeysRef.current.has('MetaLeft')) {
+      modifiers.leftWindows = true;
+    }
+    if (pressedKeysRef.current.has('MetaRight')) {
+      modifiers.rightWindows = true;
+    }
+
+    return modifiers;
   }
 
   function getCtrl(event: KeyboardEvent) {
