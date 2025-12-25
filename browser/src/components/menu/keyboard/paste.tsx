@@ -6,6 +6,8 @@ import { device } from '@/libs/device';
 import { Modifiers } from '@/libs/device/keyboard.ts';
 import { CharCodes, ShiftChars, AltGrChars } from '@/libs/keyboard';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const Paste = () => {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
@@ -47,8 +49,9 @@ export const Paste = () => {
           modifiers.leftShift = true;
         }
 
-        // Send key press and release (no delay needed - serial communication is already slow enough)
+        // Send key press and release
         await send(modifiers, code);
+        await sleep(20);
       }
 
       console.log('Paste completed');
@@ -62,6 +65,8 @@ export const Paste = () => {
   async function send(modifiers: Modifiers, code: number) {
     const keys = [0x00, 0x00, code, 0x00, 0x00, 0x00];
     await device.sendKeyboardData(modifiers, keys);
+
+    await sleep(20);
 
     await device.sendKeyboardData(new Modifiers(), [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
   }
