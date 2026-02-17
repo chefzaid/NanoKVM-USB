@@ -10,8 +10,7 @@ import '@/assets/keyboard.css';
 
 import { isKeyboardOpenAtom } from '@/jotai/keyboard.ts';
 import { device } from '@/libs/device';
-import { Modifiers } from '@/libs/device/keyboard.ts';
-import { KeyboardCodes } from '@/libs/keyboard';
+import { KeyboardReport } from '@/libs/keyboard/keyboard.ts';
 
 import {
   doubleKeys,
@@ -20,7 +19,7 @@ import {
   keyboardOptions,
   keyboardOptionsAzerty,
   modifierKeys,
-  specialKeyMap
+  specialKeys
 } from './keys.ts';
 
 type KeyboardProps = {
@@ -33,90 +32,59 @@ export const VirtualKeyboard = ({ isBigScreen }: KeyboardProps) => {
   const [activeModifierKeys, setActiveModifierKeys] = useState<string[]>([]);
   const [layoutName, setLayoutName] = useState<'default' | 'azerty'>('azerty');
 
-  const keyboardRef = useRef<any>(null);
+  const keyboardRef = useRef(new KeyboardReport());
 
   // Determine which keyboard options to use based on layout
   const currentKeyboardOptions = layoutName === 'azerty' ? keyboardOptionsAzerty : keyboardOptions;
 
-  async function onKeyPress(key: string) {
-    if (modifierKeys.includes(key)) {
-      if (activeModifierKeys.includes(key)) {
-        await sendKeydown(key);
-        await sendKeyup();
-      } else {
+  // Key down event
+  async function onKeyPress(key: string): Promise<void> {
+    if (modifierKeys[key]) {
+      if (!activeModifierKeys.includes(key)) {
+        // Save modifier key
         setActiveModifierKeys([...activeModifierKeys, key]);
+      } else {
+        // Press and release modifier keys
+        for (const modifierKey of activeModifierKeys) {
+          await handleKeyEvent({ type: 'keydown', key: modifierKey });
+        }
+        for (const modifierKey of activeModifierKeys) {
+          await handleKeyEvent({ type: 'keyup', key: modifierKey });
+        }
+        setActiveModifierKeys([]);
       }
       return;
     }
 
-    await sendKeydown(key);
+    for (const modifierKey of activeModifierKeys) {
+      await handleKeyEvent({ type: 'keydown', key: modifierKey });
+    }
+
+    await handleKeyEvent({ type: 'keydown', key });
   }
 
-  async function onKeyReleased(key: string) {
-    if (modifierKeys.includes(key)) {
+  // Key up event
+  async function onKeyReleased(key: string): Promise<void> {
+    // Skip modifier key
+    if (modifierKeys[key]) {
       return;
     }
 
-    await sendKeyup();
-  }
-
-  async function sendKeydown(key: string) {
-    const specialKey = specialKeyMap.get(key);
-    const code = KeyboardCodes.get(specialKey ? specialKey : key);
-    if (!code) {
-      console.log('unknown code: ', key);
-      return;
+    for (const modifierKey of activeModifierKeys) {
+      await handleKeyEvent({ type: 'keyup', key: modifierKey });
     }
-
-    const ctrl = getCtrl();
-    const keys = [0x00, 0x00, code, 0x00, 0x00, 0x00];
-    await device.sendKeyboardData(ctrl, keys);
-  }
-
-  async function sendKeyup() {
-    const ctrl = new Modifiers();
-    const keys = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-    await device.sendKeyboardData(ctrl, keys);
+    await handleKeyEvent({ type: 'keyup', key });
 
     setActiveModifierKeys([]);
   }
 
-  function getCtrl() {
-    const modifiers = new Modifiers();
+  async function handleKeyEvent(event: { type: 'keydown' | 'keyup'; key: string }): Promise<void> {
+    const code = specialKeys[event.key] ?? event.key;
 
-    activeModifierKeys.forEach((modifierKey) => {
-      const specialKey = specialKeyMap.get(modifierKey)!;
-      switch (specialKey) {
-        case 'ControlLeft':
-          modifiers.leftCtrl = true;
-          break;
-        case 'ControlRight':
-          modifiers.rightCtrl = true;
-          break;
-        case 'ShiftLeft':
-          modifiers.leftShift = true;
-          break;
-        case 'ShiftRight':
-          modifiers.rightShift = true;
-          break;
-        case 'AltLeft':
-          modifiers.leftAlt = true;
-          break;
-        case 'AltRight':
-          modifiers.rightAlt = true;
-          break;
-        case 'MetaLeft':
-          modifiers.leftWindows = true;
-          break;
-        case 'MetaRight':
-          modifiers.rightWindows = true;
-          break;
-        default:
-          break;
-      }
-    });
+    const kb = keyboardRef.current;
+    const report = event.type === 'keydown' ? kb.keyDown(code) : kb.keyUp(code);
 
-    return modifiers;
+    await device.sendKeyboardData(report);
   }
 
   function getButtonTheme(): KeyboardButtonTheme[] {
@@ -180,7 +148,6 @@ export const VirtualKeyboard = ({ isBigScreen }: KeyboardProps) => {
             <Keyboard
               key={layoutName}
               buttonTheme={getButtonTheme()}
-              keyboardRef={(r: any) => (keyboardRef.current = r)}
               onKeyPress={onKeyPress}
               onKeyReleased={onKeyReleased}
               layoutName="default"

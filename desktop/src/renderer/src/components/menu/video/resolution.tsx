@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 
 import { resolutionAtom } from '@renderer/jotai/device'
 import { isKeyboardEnableAtom } from '@renderer/jotai/keyboard'
-import { camera } from '@renderer/libs/camera'
+import { camera } from '@renderer/libs/media/camera'
 import * as storage from '@renderer/libs/storage'
 import type { Resolution as VideoResolution } from '@renderer/types'
 
@@ -23,6 +23,7 @@ export const Resolution = (): ReactElement => {
   const [customResolutions, setCustomResolutions] = useState<VideoResolution[]>([])
 
   const resolutions: VideoResolution[] = [
+    { width: 3840, height: 2160 },
     { width: 2560, height: 1440 },
     { width: 1920, height: 1080 },
     { width: 1280, height: 720 },
@@ -150,8 +151,8 @@ export const Resolution = (): ReactElement => {
   return (
     <>
       <Popover content={content} placement="rightTop" arrow={false} align={{ offset: [13, 0] }}>
-        <div className="flex h-[30px] cursor-pointer items-center space-x-2 rounded px-3 text-neutral-300 hover:bg-neutral-700">
-          <RatioIcon size={18} />
+        <div className="flex h-[30px] cursor-pointer items-center space-x-2 rounded px-3 text-neutral-300 hover:bg-neutral-700/50">
+          <RatioIcon size={16} />
           <span className="text-sm select-none">{t('video.resolution')}</span>
         </div>
       </Popover>
@@ -161,7 +162,7 @@ export const Resolution = (): ReactElement => {
         title={t('video.custom.title')}
         footer={null}
         closable={false}
-        destroyOnClose
+        destroyOnHidden
       >
         <div className="flex flex-col items-center justify-center space-y-5 py-10">
           <div className="flex items-center space-x-5">

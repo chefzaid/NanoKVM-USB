@@ -1,110 +1,190 @@
 import { ReactElement, useEffect, useRef } from 'react'
+import { useAtomValue } from 'jotai'
 
 import { IpcEvents } from '@common/ipc-events'
-import { KeyboardCodes } from '@renderer/libs/keyboard'
+import { isKeyboardEnableAtom } from '@renderer/jotai/keyboard'
+import { KeyboardReport } from '@renderer/libs/keyboard/keyboard'
+import { isModifier } from '@renderer/libs/keyboard/keymap'
+
+interface AltGrState {
+  active: boolean
+  ctrlLeftTimestamp: number
+}
+
+const ALTGR_THRESHOLD_MS = 10
 
 export const Keyboard = (): ReactElement => {
-  const modifierKeys = new Set(['Control', 'Shift', 'Alt', 'Meta'])
+  const isKeyboardEnabled = useAtomValue(isKeyboardEnableAtom)
 
-  const pressedKeysRef = useRef<Set<string>>(new Set())
+  const keyboardRef = useRef(new KeyboardReport())
+  const pressedKeys = useRef(new Set<string>())
+  const altGrState = useRef<AltGrState | null>(null)
+  const isComposing = useRef(false)
 
-  // listen keyboard events
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
+    initAltGr()
 
-    // press button
+    if (!isKeyboardEnabled) {
+      releaseKeys()
+      return
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keyup', handleKeyUp)
+    document.addEventListener('compositionstart', handleCompositionStart)
+    document.addEventListener('compositionend', handleCompositionEnd)
+    window.addEventListener('blur', handleBlur)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Key down event
     async function handleKeyDown(event: KeyboardEvent): Promise<void> {
-      // Only intercept keyboard events when not typing in input fields
-      const target = event.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return
-      }
+      if (!isKeyboardEnabled) return
+
+      // Skip during IME composition
+      if (isComposing.current || event.isComposing) return
 
       event.preventDefault()
       event.stopPropagation()
 
-      if (modifierKeys.has(event.key)) {
-        pressedKeysRef.current.add(event.code)
-        // Send modifier key immediately so it's active for mouse clicks
-        await sendModifiersOnly()
+      // Fallback for Japanese keyboards with Microsoft IME where event.code is empty for right Shift
+      let code = event.code
+      if (!code && event.key === 'Shift') {
+        code = 'ShiftRight'
+      }
+      if (pressedKeys.current.has(code)) {
         return
       }
 
-      await sendKeyDown(event)
+      // When AltGr is pressed, browsers send ControlLeft followed immediately by AltRight
+      if (altGrState.current) {
+        if (code === 'ControlLeft') {
+          altGrState.current.ctrlLeftTimestamp = event.timeStamp
+        } else if (code === 'AltRight') {
+          const timeDiff = event.timeStamp - altGrState.current.ctrlLeftTimestamp
+          if (timeDiff < ALTGR_THRESHOLD_MS && pressedKeys.current.has('ControlLeft')) {
+            pressedKeys.current.delete('ControlLeft')
+            handleKeyEvent({ type: 'keyup', code: 'ControlLeft' })
+            altGrState.current.active = true
+          }
+        }
+      }
+
+      pressedKeys.current.add(code)
+      await handleKeyEvent({ type: 'keydown', code })
     }
 
-    // release button
+    // Key up event
     async function handleKeyUp(event: KeyboardEvent): Promise<void> {
-      // Only intercept keyboard events when not typing in input fields
-      const target = event.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return
-      }
+      if (!isKeyboardEnabled) return
+
+      if (isComposing.current || event.isComposing) return
 
       event.preventDefault()
       event.stopPropagation()
 
-      if (modifierKeys.has(event.key)) {
-        pressedKeysRef.current.delete(event.code)
+      // Fallback for Japanese keyboards with Microsoft IME where event.code is empty for right Shift
+      let code = event.code
+      if (!code && event.key === 'Shift') {
+        code = 'ShiftRight'
       }
 
-      await send(0, 0x00)
+      // Handle AltGr state for Windows
+      if (altGrState.current?.active) {
+        if (code === 'ControlLeft') return
+
+        if (code === 'AltRight') {
+          altGrState.current.active = false
+        }
+      }
+
+      // Compatible with macOS's command key combinations
+      if (code === 'MetaLeft' || code === 'MetaRight') {
+        const keysToRelease: string[] = []
+        pressedKeys.current.forEach((pressedCode) => {
+          if (!isModifier(pressedCode)) {
+            keysToRelease.push(pressedCode)
+          }
+        })
+
+        for (const key of keysToRelease) {
+          await handleKeyEvent({ type: 'keyup', code: key })
+          pressedKeys.current.delete(key)
+        }
+      }
+
+      pressedKeys.current.delete(code)
+      await handleKeyEvent({ type: 'keyup', code })
     }
 
-    return (): void => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
+    // Composition start event
+    function handleCompositionStart(): void {
+      isComposing.current = true
     }
-  }, [])
 
-  async function sendKeyDown(event: KeyboardEvent): Promise<void> {
-    const code = KeyboardCodes.get(event.code)
-    if (!code) return
+    // Composition end event
+    function handleCompositionEnd(): void {
+      isComposing.current = false
+    }
 
-    const modifier = getModifier(event)
+    // Release all keys when window loses focus
+    async function handleBlur(): Promise<void> {
+      await releaseKeys()
+    }
 
-    await send(modifier, code)
+    // Release all keys before window closes
+    async function handleVisibilityChange(): Promise<void> {
+      if (document.hidden) {
+        await releaseKeys()
+      }
+    }
+
+    // Release all keys
+    async function releaseKeys(): Promise<void> {
+      for (const code of pressedKeys.current) {
+        await handleKeyEvent({ type: 'keyup', code })
+      }
+
+      pressedKeys.current.clear()
+
+      // Reset AltGr state
+      if (altGrState.current) {
+        altGrState.current.active = false
+        altGrState.current.ctrlLeftTimestamp = 0
+      }
+
+      const report = keyboardRef.current.reset()
+      await sendReport(report)
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handleKeyUp)
+      document.removeEventListener('compositionstart', handleCompositionStart)
+      document.removeEventListener('compositionend', handleCompositionEnd)
+      window.removeEventListener('blur', handleBlur)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+      releaseKeys()
+    }
+  }, [isKeyboardEnabled])
+
+  async function initAltGr(): Promise<void> {
+    const platform = await window.electron.ipcRenderer.invoke(IpcEvents.GET_PLATFORM)
+    const isWin = platform.toLowerCase().startsWith('win')
+    if (isWin && !altGrState.current) {
+      altGrState.current = { active: false, ctrlLeftTimestamp: 0 }
+    }
   }
 
-  async function sendModifiersOnly(): Promise<void> {
-    const modifier = getCurrentModifier()
-    await send(modifier, 0x00)
+  // Keyboard handler
+  async function handleKeyEvent(event: { type: 'keydown' | 'keyup'; code: string }): Promise<void> {
+    const kb = keyboardRef.current
+    const report = event.type === 'keydown' ? kb.keyDown(event.code) : kb.keyUp(event.code)
+    await sendReport(report)
   }
 
-  async function send(modifier: number, key: number): Promise<void> {
-    await window.electron.ipcRenderer.invoke(IpcEvents.SEND_KEYBOARD, modifier, key)
-  }
-
-  function getCurrentModifier(): number {
-    const pressedKeys = [
-      pressedKeysRef.current.has('ControlLeft'),
-      pressedKeysRef.current.has('ShiftLeft'),
-      pressedKeysRef.current.has('AltLeft'),
-      pressedKeysRef.current.has('MetaLeft'),
-      pressedKeysRef.current.has('ControlRight'),
-      pressedKeysRef.current.has('ShiftRight'),
-      pressedKeysRef.current.has('AltRight'),
-      pressedKeysRef.current.has('MetaRight')
-    ]
-
-    return pressedKeys.reduce((acc, isPressed, bit) => (isPressed ? acc | (1 << bit) : acc), 0)
-  }
-
-  function getModifier(e: KeyboardEvent): number {
-    const altGraphKey = e.getModifierState('AltGraph')
-    const pressedKeys = [
-      altGraphKey || (e.ctrlKey && pressedKeysRef.current.has('ControlLeft')),
-      e.shiftKey && pressedKeysRef.current.has('ShiftLeft'),
-      e.altKey && pressedKeysRef.current.has('AltLeft'),
-      e.metaKey && pressedKeysRef.current.has('MetaLeft'),
-      e.ctrlKey && pressedKeysRef.current.has('ControlRight'),
-      e.shiftKey && pressedKeysRef.current.has('ShiftRight'),
-      altGraphKey || (e.altKey && pressedKeysRef.current.has('AltRight')),
-      e.metaKey && pressedKeysRef.current.has('MetaRight')
-    ]
-
-    return pressedKeys.reduce((acc, isPressed, bit) => (isPressed ? acc | (1 << bit) : acc), 0)
+  async function sendReport(report: number[]): Promise<void> {
+    await window.electron.ipcRenderer.invoke(IpcEvents.SEND_KEYBOARD, report)
   }
 
   return <></>

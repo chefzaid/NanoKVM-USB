@@ -25,6 +25,8 @@ const en = {
     video: {
       resolution: 'Resolution',
       scale: 'Scale',
+      auto: "Auto",
+      rotation: 'Rotation',
       customResolution: 'Custom',
       device: 'Device',
       custom: {
@@ -35,13 +37,26 @@ const en = {
         cancel: 'Cancel'
       }
     },
+    audio: {
+      tip: 'Tip',
+      permission:
+        'Microphone access is required to connect your USB audio device. The operating system classifies USB inputs as microphones, so this permission is necessary.\n\nThis action is solely for device connectivity and does not enable audio recording.',
+      viewDoc: 'View document.',
+      ok: 'Ok'
+    },
     keyboard: {
       paste: 'Paste',
       virtualKeyboard: 'Keyboard',
-      shortcuts: 'Shortcuts',
-      ctrlAltDel: 'Ctrl + Alt + Delete',
-      ctrlD: 'Ctrl + D',
-      winTab: 'Win + Tab',
+      shortcut: {
+        title: 'Shortcuts',
+        custom: 'Custom',
+        capture: 'Click here to capture shortcut',
+        clear: 'Clear',
+        save: 'Save',
+        captureTips:
+          'Capturing system-level keys (such as the Windows key) requires full-screen permission.',
+        enterFullScreen: 'Toggle full-screen mode.'
+      }
     },
     mouse: {
       cursor: {

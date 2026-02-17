@@ -1,139 +1,178 @@
 import { ReactElement, useEffect, useRef } from 'react'
 import { useAtomValue } from 'jotai'
+import { useMediaQuery } from 'react-responsive'
 
 import { IpcEvents } from '@common/ipc-events'
-import { resolutionAtom } from '@renderer/jotai/device'
 import { scrollDirectionAtom, scrollIntervalAtom } from '@renderer/jotai/mouse'
+import { MouseAbsoluteRelative } from '@renderer/libs/mouse'
 import { mouseJiggler } from '@renderer/libs/mouse-jiggler'
-import type { Mouse as MouseKey } from '@renderer/types'
+
+import { createInitialTouchState, createTouchHandlers } from './touchpad'
+import { MouseAbsoluteEvent } from './types'
 
 export const Absolute = (): ReactElement => {
-  const resolution = useAtomValue(resolutionAtom)
+  const isBigScreen = useMediaQuery({ minWidth: 650 })
+
   const scrollDirection = useAtomValue(scrollDirectionAtom)
   const scrollInterval = useAtomValue(scrollIntervalAtom)
 
-  const keyRef = useRef<MouseKey>({
-    left: false,
-    right: false,
-    mid: false
-  })
+  const mouseRef = useRef(new MouseAbsoluteRelative())
+  const lastPosRef = useRef({ x: 0.5, y: 0.5 })
   const lastScrollTimeRef = useRef(0)
+  const touchStateRef = useRef(createInitialTouchState())
 
   useEffect(() => {
-    const canvas = document.getElementById('video')
-    if (!canvas) return
+    const screen = document.getElementById('video') as HTMLVideoElement
+    if (!screen) return
 
-    canvas.addEventListener('mousedown', handleMouseDown)
-    canvas.addEventListener('mouseup', handleMouseUp)
-    canvas.addEventListener('mousemove', handleMouseMove)
-    canvas.addEventListener('wheel', handleWheel)
-    canvas.addEventListener('click', disableEvent)
-    canvas.addEventListener('contextmenu', disableEvent)
+    function getCoordinate(event: { clientX: number; clientY: number }): { x: number; y: number } {
+      const rect = screen.getBoundingClientRect()
 
-    // press button
-    async function handleMouseDown(event: MouseEvent): Promise<void> {
-      disableEvent(event)
+      const clientX = event.clientX
+      const clientY = event.clientY
 
-      switch (event.button) {
-        case 0:
-          keyRef.current.left = true
-          break
-        case 1:
-          keyRef.current.mid = true
-          break
-        case 2:
-          keyRef.current.right = true
-          break
-        default:
-          console.log(`unknown button ${event.button}`)
-          return
+      if (!screen.videoWidth || !screen.videoHeight) {
+        const x = (clientX - rect.left) / rect.width
+        const y = (clientY - rect.top) / rect.height
+        return { x, y }
       }
 
-      await send(event)
-    }
+      const videoRatio = screen.videoWidth / screen.videoHeight
+      const elementRatio = rect.width / rect.height
 
-    // release button
-    async function handleMouseUp(event: MouseEvent): Promise<void> {
-      disableEvent(event)
+      let renderedWidth = rect.width
+      let renderedHeight = rect.height
+      let offsetX = 0
+      let offsetY = 0
 
-      switch (event.button) {
-        case 0:
-          keyRef.current.left = false
-          break
-        case 1:
-          keyRef.current.mid = false
-          break
-        case 2:
-          keyRef.current.right = false
-          break
-        default:
-          console.log(`unknown button ${event.button}`)
-          return
+      if (videoRatio > elementRatio) {
+        renderedHeight = rect.width / videoRatio
+        offsetY = (rect.height - renderedHeight) / 2
+      } else {
+        renderedWidth = rect.height * videoRatio
+        offsetX = (rect.width - renderedWidth) / 2
       }
 
-      await send(event)
+      const x = (clientX - rect.left - offsetX) / renderedWidth
+      const y = (clientY - rect.top - offsetY) / renderedHeight
+      return { x, y }
     }
 
-    // mouse move
-    async function handleMouseMove(event: MouseEvent): Promise<void> {
-      disableEvent(event)
-      await send(event)
+    // Disable default events
+    function disableEvent(event: Event): void {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
+    // Mouse event handler
+    function handleMouseEvent(event: MouseAbsoluteEvent): void {
+      let report: number[]
+      const mouse = mouseRef.current
+
+      switch (event.type) {
+        case 'mousedown':
+          mouse.buttonDown(event.button)
+          report = mouse.buildButtonReport(lastPosRef.current.x, lastPosRef.current.y)
+          break
+        case 'mouseup':
+          mouse.buttonUp(event.button)
+          report = mouse.buildButtonReport(lastPosRef.current.x, lastPosRef.current.y)
+          break
+        case 'wheel':
+          report = mouse.buildReport(lastPosRef.current.x, lastPosRef.current.y, event.deltaY)
+          break
+        case 'move':
+          report = mouse.buildReport(event.x, event.y)
+          lastPosRef.current = { x: event.x, y: event.y }
+          break
+        default:
+          report = mouse.buildReport(lastPosRef.current.x, lastPosRef.current.y)
+          break
+      }
+
+      window.electron.ipcRenderer.invoke(IpcEvents.SEND_MOUSE, [0x02, ...report])
 
       mouseJiggler.moveEventCallback()
     }
 
-    // mouse scroll
-    async function handleWheel(event: WheelEvent): Promise<void> {
-      disableEvent(event)
+    // Mouse down event
+    function handleMouseDown(e: MouseEvent): void {
+      disableEvent(e)
+      handleMouseEvent({ type: 'mousedown', button: e.button })
+    }
+
+    // Mouse up event
+    function handleMouseUp(e: MouseEvent): void {
+      disableEvent(e)
+      handleMouseEvent({ type: 'mouseup', button: e.button })
+    }
+
+    // Mouse move event
+    function handleMouseMove(e: MouseEvent): void {
+      disableEvent(e)
+      const { x, y } = getCoordinate(e)
+      handleMouseEvent({ type: 'move', x, y })
+    }
+
+    // Mouse wheel event
+    function handleWheel(e: WheelEvent): void {
+      disableEvent(e)
+
+      if (Math.floor(e.deltaY) === 0) {
+        return
+      }
 
       const currentTime = Date.now()
       if (currentTime - lastScrollTimeRef.current < scrollInterval) {
         return
       }
 
-      const delta = Math.floor(event.deltaY)
-      if (delta === 0) return
-
-      await send(event, delta > 0 ? -1 * scrollDirection : scrollDirection)
-
+      const deltaY = (e.deltaY > 0 ? 1 : -1) * scrollDirection
+      handleMouseEvent({ type: 'wheel', deltaY })
       lastScrollTimeRef.current = currentTime
     }
 
-    async function send(event: MouseEvent, scroll: number = 0): Promise<void> {
-      const key =
-        (keyRef.current.left ? 1 : 0) |
-        (keyRef.current.right ? 2 : 0) |
-        (keyRef.current.mid ? 4 : 0)
+    // Add mouse event listeners
+    screen.addEventListener('mousedown', handleMouseDown)
+    screen.addEventListener('mouseup', handleMouseUp)
+    screen.addEventListener('mousemove', handleMouseMove)
+    screen.addEventListener('wheel', handleWheel)
+    screen.addEventListener('click', disableEvent)
+    screen.addEventListener('contextmenu', disableEvent)
 
-      const rect = canvas!.getBoundingClientRect()
-      const x = Math.abs(event.clientX - rect.left)
-      const y = Math.abs(event.clientY - rect.top)
+    // Create touch handlers
+    const touchState = touchStateRef.current
+    const touchHandlers = createTouchHandlers(touchState, {
+      scrollDirection,
+      scrollInterval,
+      getCoordinate,
+      handleMouseEvent,
+      disableEvent
+    })
 
-      await window.electron.ipcRenderer.invoke(
-        IpcEvents.SEND_MOUSE_ABSOLUTE,
-        key,
-        rect.width,
-        rect.height,
-        x,
-        y,
-        scroll
-      )
+    // Add touch event listeners (only on big screens)
+    if (isBigScreen) {
+      screen.addEventListener('touchstart', touchHandlers.handleTouchStart)
+      screen.addEventListener('touchmove', touchHandlers.handleTouchMove)
+      screen.addEventListener('touchend', touchHandlers.handleTouchEnd)
+      screen.addEventListener('touchcancel', touchHandlers.handleTouchCancel)
     }
 
-    return (): void => {
-      canvas.removeEventListener('mousemove', handleMouseMove)
-      canvas.removeEventListener('mousedown', handleMouseDown)
-      canvas.removeEventListener('mouseup', handleMouseUp)
-      canvas.removeEventListener('wheel', handleWheel)
-      canvas.removeEventListener('click', disableEvent)
-      canvas.removeEventListener('contextmenu', disableEvent)
-    }
-  }, [resolution, scrollDirection, scrollInterval])
+    return () => {
+      screen.removeEventListener('mousedown', handleMouseDown)
+      screen.removeEventListener('mouseup', handleMouseUp)
+      screen.removeEventListener('mousemove', handleMouseMove)
+      screen.removeEventListener('wheel', handleWheel)
+      screen.removeEventListener('click', disableEvent)
+      screen.removeEventListener('contextmenu', disableEvent)
+      screen.removeEventListener('touchstart', touchHandlers.handleTouchStart)
+      screen.removeEventListener('touchmove', touchHandlers.handleTouchMove)
+      screen.removeEventListener('touchend', touchHandlers.handleTouchEnd)
+      screen.removeEventListener('touchcancel', touchHandlers.handleTouchCancel)
 
-  function disableEvent(event: MouseEvent): void {
-    event.preventDefault()
-    event.stopPropagation()
-  }
+      touchHandlers.cleanup()
+    }
+  }, [isBigScreen, scrollDirection, scrollInterval])
 
   return <></>
 }

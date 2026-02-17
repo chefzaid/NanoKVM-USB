@@ -37,7 +37,11 @@ const pt_br = {
     keyboard: {
       paste: 'Colar',
       virtualKeyboard: 'Teclado Virtual',
-      ctrlAltDel: 'Ctrl + Alt + Delete'
+      shortcut: {
+        ctrlAltDel: 'Ctrl + Alt + Delete',
+        ctrlD: 'Ctrl + D',
+        winTab: 'Win + Tab'
+      }
     },
     mouse: {
       cursor: {
@@ -56,7 +60,8 @@ const pt_br = {
       speed: 'Velocidade do scroll',
       fast: 'Rápido',
       slow: 'Lento',
-      requestPointer: 'Usando modo relativo. Por favor, clique na área de trabalho para restaurar o ponteiro do mouse.'
+      requestPointer:
+        'Usando modo relativo. Por favor, clique na área de trabalho para restaurar o ponteiro do mouse.'
     },
     settings: {
       language: 'Linguagem',

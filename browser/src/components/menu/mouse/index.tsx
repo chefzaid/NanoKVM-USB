@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Popover } from 'antd';
+import { Divider, Popover } from 'antd';
 import { useAtom, useSetAtom } from 'jotai';
 import { MouseIcon } from 'lucide-react';
 
@@ -10,6 +10,7 @@ import {
   scrollDirectionAtom,
   scrollIntervalAtom
 } from '@/jotai/mouse.ts';
+import { mouseJiggler } from '@/libs/mouse-jiggler';
 import * as storage from '@/libs/storage';
 
 import { Direction } from './direction.tsx';
@@ -23,7 +24,7 @@ export const Mouse = () => {
   const [mouseMode, setMouseMode] = useAtom(mouseModeAtom);
   const setScrollDirection = useSetAtom(scrollDirectionAtom);
   const setScrollInterval = useSetAtom(scrollIntervalAtom);
-  const [mouseJigglerMode, setMouseJigglerMode] = useAtom(mouseJigglerModeAtom);
+  const setMouseJigglerMode = useSetAtom(mouseJigglerModeAtom);
 
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
@@ -53,19 +54,20 @@ export const Mouse = () => {
     }
 
     const jiggler = storage.getMouseJigglerMode();
-    if (mouseJigglerMode !== jiggler) {
-      setMouseJigglerMode(jiggler);
-    }
+    mouseJiggler.setMode(jiggler);
+    setMouseJigglerMode(jiggler);
   }
 
   const content = (
-    <>
+    <div className="flex flex-col space-y-0.5">
       <Style />
       <Mode />
       <Direction />
       <Speed />
+
+      <Divider style={{ margin: '5px 0 5px 0' }} />
       <Jiggler />
-    </>
+    </div>
   );
 
   return (
@@ -77,7 +79,7 @@ export const Mouse = () => {
       open={isPopoverOpen}
       onOpenChange={setIsPopoverOpen}
     >
-      <div className="flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded text-white hover:bg-neutral-700/70">
+      <div className="flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded text-neutral-300 hover:bg-neutral-700/70 hover:text-white">
         <MouseIcon size={18} />
       </div>
     </Popover>

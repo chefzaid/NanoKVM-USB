@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Button, Divider, InputNumber, Modal, Popover } from 'antd';
 import clsx from 'clsx';
 import { useAtom, useSetAtom } from 'jotai';
-import { RatioIcon, Trash2Icon } from 'lucide-react';
+import { MonitorIcon, Trash2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { resolutionAtom } from '@/jotai/device.ts';
 import { isKeyboardEnableAtom } from '@/jotai/keyboard.ts';
-import { camera } from '@/libs/camera';
+import { camera } from '@/libs/media/camera.ts';
 import * as storage from '@/libs/storage';
 import type { Resolution as VideoResolution } from '@/types';
 
@@ -22,6 +22,7 @@ export const Resolution = () => {
   const [customResolutions, setCustomResolutions] = useState<VideoResolution[]>([]);
 
   const resolutions: VideoResolution[] = [
+    { width: 3840, height: 2160 },
     { width: 2560, height: 1440 },
     { width: 1920, height: 1080 },
     { width: 1280, height: 720 },
@@ -101,7 +102,7 @@ export const Resolution = () => {
         <div
           key={res.width}
           className={clsx(
-            'flex cursor-pointer select-none items-center space-x-1 rounded px-3 py-1.5 hover:bg-neutral-700/60',
+            'flex cursor-pointer select-none items-center space-x-1 rounded px-4 py-1.5 hover:bg-neutral-700/60',
             resolution.width === res.width && resolution.height === res.height
               ? 'text-blue-500'
               : 'text-white'
@@ -118,13 +119,13 @@ export const Resolution = () => {
 
       {/* custom resolution */}
       <div
-        className="flex cursor-pointer select-none items-center justify-between space-x-3 rounded px-3 py-1.5 text-sm hover:bg-neutral-700/60"
+        className="flex cursor-pointer select-none items-center justify-between space-x-3 rounded px-4 py-1.5 text-sm hover:bg-neutral-700/60"
         onClick={showModal}
       >
         <span>{t('video.customResolution')}</span>
         {customResolutions.length > 0 && (
           <span className="hover:text-red-500" onClick={removeCustomResolution}>
-            <Trash2Icon size={16} />
+            <Trash2Icon size={14} />
           </span>
         )}
       </div>
@@ -133,7 +134,7 @@ export const Resolution = () => {
         <div
           key={res.width}
           className={clsx(
-            'flex cursor-pointer select-none items-center space-x-1 rounded px-3 py-1.5 hover:bg-neutral-700/60',
+            'flex cursor-pointer select-none items-center space-x-1 rounded px-4 py-1.5 hover:bg-neutral-700/60',
             resolution.width === res.width && resolution.height === res.height
               ? 'text-blue-500'
               : 'text-white'
@@ -151,8 +152,8 @@ export const Resolution = () => {
   return (
     <>
       <Popover content={content} placement="rightTop" arrow={false} align={{ offset: [13, 0] }}>
-        <div className="flex h-[30px] cursor-pointer items-center space-x-2 rounded px-3 text-neutral-300 hover:bg-neutral-700">
-          <RatioIcon size={18} />
+        <div className="flex h-[32px] cursor-pointer items-center space-x-2 rounded px-3 text-neutral-300 hover:bg-neutral-700/50">
+          <MonitorIcon size={16} />
           <span className="select-none text-sm">{t('video.resolution')}</span>
         </div>
       </Popover>
@@ -162,7 +163,7 @@ export const Resolution = () => {
         title={t('video.custom.title')}
         footer={null}
         closable={false}
-        destroyOnClose
+        destroyOnHidden
       >
         <div className="flex flex-col items-center justify-center space-y-5 py-10">
           <div className="flex items-center space-x-5">

@@ -10,12 +10,19 @@ const en = {
     modal: {
       title: 'Select USB Device',
       selectVideo: 'Please select a video input device',
-      selectSerial: 'Please select serial device'
+      selectSerial: 'Please select serial device',
+      selectBaudRate: 'Please select baud rate'
     },
     menu: {
       serial: 'Serial',
       keyboard: 'Keyboard',
-      mouse: 'Mouse'
+      mouse: 'Mouse',
+      serialPort: {
+        device: 'Serial Device',
+        baudRate: 'Baud Rate',
+        noDeviceFound: 'No serial devices found',
+        clickToSelect: 'Click to select serial port'
+      }
     },
     video: {
       resolution: 'Resolution',
@@ -30,10 +37,23 @@ const en = {
         cancel: 'Cancel'
       }
     },
+    audio: {
+      tip: 'Tip',
+      permission:
+        'Microphone access is required to connect your USB audio device. The operating system classifies USB inputs as microphones, so this permission is necessary.\n\nThis action is solely for device connectivity and does not enable audio recording.',
+      viewDoc: 'View document.',
+      ok: 'Ok'
+    },
     keyboard: {
       paste: 'Paste',
       virtualKeyboard: 'Keyboard',
-      ctrlAltDel: 'Ctrl + Alt + Delete'
+      shortcut: {
+        title: 'Shortcuts',
+        custom: 'Custom',
+        capture: 'Click here to capture shortcut',
+        clear: 'Clear',
+        save: 'Save'
+      }
     },
     mouse: {
       cursor: {
@@ -81,6 +101,18 @@ const en = {
         title: 'About',
         version: 'Version',
         community: 'Community'
+      },
+      reset: {
+        title: 'Reset Settings',
+        description: 'Reset all application settings to default values',
+        warning: 'Warning',
+        warningDescription: 'This action cannot be undone. All your custom settings will be lost.',
+        button: 'Reset All Settings',
+        confirmTitle: 'Confirm Reset',
+        confirmMessage:
+          'Are you sure you want to reset all settings? This action cannot be undone.',
+        confirm: 'Reset',
+        cancel: 'Cancel'
       }
     }
   }

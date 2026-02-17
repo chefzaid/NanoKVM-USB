@@ -3,7 +3,8 @@ import { ClipboardIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { IpcEvents } from '@common/ipc-events'
-import { CharCodes, ShiftChars, AltGrChars } from '@renderer/libs/keyboard'
+import { CharCodes, ShiftChars, AltGrChars } from '@renderer/libs/keyboard/charCodes'
+import { getModifierBit } from '@renderer/libs/keyboard/keymap'
 
 export const Paste = (): ReactElement => {
   const { t } = useTranslation()
@@ -26,32 +27,24 @@ export const Paste = (): ReactElement => {
         const ascii = char.charCodeAt(0)
 
         // Skip carriage return (CR) to avoid double line breaks on Windows (\r\n)
-        // Only process line feed (LF) which will be converted to Enter
         if (ascii === 13) {
           continue
         }
 
-        const code = CharCodes.get(ascii)
-        if (!code) {
-          console.log(`Skipping unsupported character: "${char}" (ASCII: ${ascii})`)
-          continue
-        }
+        const code = CharCodes[ascii]
+        if (!code) continue
 
-        // Determine modifier based on character
         let modifier = 0
-        if (AltGrChars.has(ascii)) {
-          // AltGr = rightAlt (bit 6) = 64
-          // Some systems need Ctrl+Alt for AltGr, so we use: leftCtrl (bit 0) + rightAlt (bit 6) = 1 + 64 = 65
-          modifier = 65
-        } else if ((ascii >= 65 && ascii <= 90) || ShiftChars.has(ascii)) {
-          // Shift = leftShift (bit 1) = 2
-          modifier = 2
+        if (AltGrChars[ascii]) {
+          // AltGr = Ctrl + rightAlt on most systems
+          modifier |= getModifierBit('ControlLeft')
+          modifier |= getModifierBit('AltRight')
+        } else if ((ascii >= 65 && ascii <= 90) || ShiftChars[ascii]) {
+          modifier |= getModifierBit('ShiftLeft')
         }
 
-        // Press key with modifier
         await send(modifier, code)
-
-        // Release key immediately (no delay needed - the serial communication is already slow enough)
+        await new Promise((r) => setTimeout(r, 100))
         await send(0, 0)
       }
 
@@ -63,16 +56,17 @@ export const Paste = (): ReactElement => {
     }
   }
 
-  async function send(modifier: number, key: number): Promise<void> {
-    await window.electron.ipcRenderer.invoke(IpcEvents.SEND_KEYBOARD, modifier, key)
+  async function send(modifier: number, code: number): Promise<void> {
+    const keys = [modifier, 0, code, 0, 0, 0, 0, 0]
+    await window.electron.ipcRenderer.invoke(IpcEvents.SEND_KEYBOARD, keys)
   }
 
   return (
     <div
-      className="flex h-[30px] cursor-pointer items-center space-x-1 rounded px-3 text-neutral-300 hover:bg-neutral-700/60"
+      className="flex h-[30px] cursor-pointer items-center space-x-2 rounded px-3 text-neutral-300 hover:bg-neutral-700/50"
       onClick={paste}
     >
-      <ClipboardIcon size={18} />
+      <ClipboardIcon size={16} />
       <span>{t('keyboard.paste')}</span>
     </div>
   )

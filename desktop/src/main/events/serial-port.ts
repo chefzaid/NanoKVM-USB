@@ -9,14 +9,22 @@ export function registerSerialPort(): void {
   ipcMain.handle(IpcEvents.OPEN_SERIAL_PORT, openSerialPort)
   ipcMain.handle(IpcEvents.CLOSE_SERIAL_PORT, closeSerialPort)
   ipcMain.handle(IpcEvents.SEND_KEYBOARD, sendKeyboard)
-  ipcMain.handle(IpcEvents.SEND_MOUSE_ABSOLUTE, sendMouseAbsolute)
-  ipcMain.handle(IpcEvents.SEND_MOUSE_RELATIVE, sendMouseRelative)
+  ipcMain.handle(IpcEvents.SEND_MOUSE, sendMouse)
 }
 
 async function getSerialPorts(): Promise<string[]> {
   try {
     const ports = await SerialPort.list()
-    return ports.map((port) => port.path)
+    const paths = ports.map((port) => port.path)
+
+    return paths.sort((a, b) => {
+      const aHasUSB = a.toLowerCase().includes('usb')
+      const bHasUSB = b.toLowerCase().includes('usb')
+
+      if (aHasUSB && !bHasUSB) return -1
+      if (!aHasUSB && bHasUSB) return 1
+      return a.localeCompare(b)
+    })
   } catch (error) {
     console.error('Error listing serial ports:', error)
     return []
@@ -26,16 +34,21 @@ async function getSerialPorts(): Promise<string[]> {
 async function openSerialPort(
   e: IpcMainInvokeEvent,
   path: string,
-  baudRate = 57600
+  baudRate: number = 57600
 ): Promise<boolean> {
   try {
-    await device.serialPort.init(path, baudRate, (err) => {
-      const msg = err ? err.message : ''
-      e.sender.send(IpcEvents.OPEN_SERIAL_PORT_RSP, msg)
-    })
+    const onDisconnect = () => {
+      e.sender.send(IpcEvents.SERIAL_PORT_DISCONNECTED)
+    }
+
+    await device.serialPort.init({ path, baudRate, onDisconnect })
+
+    e.sender.send(IpcEvents.OPEN_SERIAL_PORT_RSP, '')
     return true
   } catch (error) {
     console.error('Error opening serial port:', error)
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+    e.sender.send(IpcEvents.OPEN_SERIAL_PORT_RSP, errorMsg)
     return false
   }
 }
@@ -50,40 +63,18 @@ async function closeSerialPort(): Promise<boolean> {
   }
 }
 
-async function sendKeyboard(_: IpcMainInvokeEvent, modifier: number, key: number): Promise<void> {
+async function sendKeyboard(_: IpcMainInvokeEvent, report: number[]): Promise<void> {
   try {
-    await device.sendKeyboardData(modifier, key)
+    await device.sendKeyboardData(report)
   } catch (error) {
     console.error('Error sending keyboard data:', error)
   }
 }
 
-async function sendMouseRelative(
-  _: IpcMainInvokeEvent,
-  key: number,
-  x: number,
-  y: number,
-  scroll: number
-): Promise<void> {
+async function sendMouse(_: IpcMainInvokeEvent, report: number[]): Promise<void> {
   try {
-    await device.sendMouseRelativeData(key, x, y, scroll)
+    await device.sendMouseData(report)
   } catch (error) {
-    console.error('Error sending mouse relative data:', error)
-  }
-}
-
-async function sendMouseAbsolute(
-  _: IpcMainInvokeEvent,
-  key: number,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  scroll: number
-): Promise<void> {
-  try {
-    await device.sendMouseAbsoluteData(key, width, height, x, y, scroll)
-  } catch (error) {
-    console.error('Error sending mouse absolute data:', error)
+    console.error('Error sending mouse data:', error)
   }
 }

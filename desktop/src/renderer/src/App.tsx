@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useMediaQuery } from 'react-responsive'
 
 import { IpcEvents } from '@common/ipc-events'
-import { DeviceModal } from '@renderer/components/device-modal'
+import { Device } from '@renderer/components/device'
 import { Keyboard } from '@renderer/components/keyboard'
 import { Menu } from '@renderer/components/menu'
 import { Mouse } from '@renderer/components/mouse'
@@ -18,8 +18,9 @@ import {
   videoStateAtom
 } from '@renderer/jotai/device'
 import { isKeyboardEnableAtom } from '@renderer/jotai/keyboard'
-import { mouseStyleAtom } from '@renderer/jotai/mouse'
-import { camera } from '@renderer/libs/camera'
+import { mouseModeAtom, mouseStyleAtom } from '@renderer/jotai/mouse'
+import { camera } from '@renderer/libs/media/camera'
+import { requestCameraPermission } from '@renderer/libs/media/permission'
 import { getVideoResolution } from '@renderer/libs/storage'
 import type { Resolution } from '@renderer/types'
 
@@ -32,12 +33,12 @@ const App = (): ReactElement => {
   const videoScale = useAtomValue(videoScaleAtom)
   const videoState = useAtomValue(videoStateAtom)
   const serialPortState = useAtomValue(serialPortStateAtom)
+  const mouseMode = useAtomValue(mouseModeAtom)
   const mouseStyle = useAtomValue(mouseStyleAtom)
   const isKeyboardEnable = useAtomValue(isKeyboardEnableAtom)
   const setResolution = useSetAtom(resolutionAtom)
 
   const [state, setState] = useState<State>('loading')
-  const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
     const resolution = getVideoResolution()
@@ -53,33 +54,11 @@ const App = (): ReactElement => {
     }
   }, [])
 
-  useEffect(() => {
-    setIsConnected(videoState === 'connected' && serialPortState === 'connected')
-  }, [videoState, serialPortState])
-
   async function requestMediaPermissions(resolution?: Resolution): Promise<void> {
     try {
-      if (window.electron.process.platform === 'darwin') {
-        const res = await window.electron.ipcRenderer.invoke(IpcEvents.REQUEST_MEDIA_PERMISSIONS)
-
-        if (!res.camera) {
-          setState('failed')
-          return
-        }
-      } else {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: resolution?.width || 1920 },
-            height: { ideal: resolution?.height || 1080 }
-          },
-          audio: true
-        })
-        stream.getTracks().forEach((track) => track.stop())
-      }
-
-      setState('success')
+      const granted = await requestCameraPermission(resolution)
+      setState(granted ? 'success' : 'failed')
     } catch (err) {
-      console.log('failed to request media permissions: ', err)
       if (err instanceof Error && ['NotAllowedError', 'PermissionDeniedError'].includes(err.name)) {
         setState('failed')
       } else {
@@ -108,26 +87,24 @@ const App = (): ReactElement => {
 
   return (
     <>
-      {isConnected ? (
+      <Device />
+
+      {videoState === 'connected' && serialPortState === 'connected' && (
         <>
           <Menu />
           <Mouse />
           {isKeyboardEnable && <Keyboard />}
         </>
-      ) : (
-        <DeviceModal />
       )}
 
       <video
         id="video"
-        className={clsx('block min-h-[480px] min-w-[640px] select-none', mouseStyle)}
-        style={{
-          transform: `scale(${videoScale})`,
-          transformOrigin: 'center',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          objectFit: 'scale-down'
-        }}
+        className={clsx(
+          'block max-h-full min-h-[480px] max-w-full min-w-[640px] origin-center object-scale-down select-none',
+          videoState === 'connected' ? 'opacity-100' : 'opacity-0',
+          mouseMode === 'relative' ? 'cursor-none' : mouseStyle
+        )}
+        style={{ transform: `scale(${videoScale})` }}
         autoPlay
         playsInline
       />

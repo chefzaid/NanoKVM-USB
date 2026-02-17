@@ -1,130 +1,175 @@
 import { useEffect, useRef } from 'react';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
+import { useMediaQuery } from 'react-responsive';
 
-import { resolutionAtom } from '@/jotai/device.ts';
-import {
-  mouseJigglerModeAtom,
-  mouseLastMoveTimeAtom,
-  scrollDirectionAtom,
-  scrollIntervalAtom
-} from '@/jotai/mouse.ts';
+import { createInitialTouchState, createTouchHandlers } from '@/components/mouse/touchpad.ts';
+import { MouseAbsoluteEvent } from '@/components/mouse/types.ts';
+import { scrollDirectionAtom, scrollIntervalAtom } from '@/jotai/mouse.ts';
 import { device } from '@/libs/device';
-import { Key } from '@/libs/device/mouse.ts';
+import { MouseAbsoluteRelative } from '@/libs/mouse';
+import { mouseJiggler } from '@/libs/mouse-jiggler';
 
 export const Absolute = () => {
-  const resolution = useAtomValue(resolutionAtom);
+  const isBigScreen = useMediaQuery({ minWidth: 650 });
+
   const scrollDirection = useAtomValue(scrollDirectionAtom);
   const scrollInterval = useAtomValue(scrollIntervalAtom);
-  const mouseJigglerMode = useAtomValue(mouseJigglerModeAtom);
-  const setMouseLastMoveTime = useSetAtom(mouseLastMoveTimeAtom);
 
-  const keyRef = useRef<Key>(new Key());
+  const mouseRef = useRef(new MouseAbsoluteRelative());
+  const lastPosRef = useRef({ x: 0.5, y: 0.5 });
   const lastScrollTimeRef = useRef(0);
+  const touchStateRef = useRef(createInitialTouchState());
 
-  // listen mouse events
   useEffect(() => {
-    const canvas = document.getElementById('video');
-    if (!canvas) return;
+    const screen = document.getElementById('video') as HTMLVideoElement;
+    if (!screen) return;
 
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('wheel', handleWheel);
-    canvas.addEventListener('click', disableEvent);
-    canvas.addEventListener('contextmenu', disableEvent);
+    // Add mouse event listeners
+    screen.addEventListener('mousedown', handleMouseDown);
+    screen.addEventListener('mouseup', handleMouseUp);
+    screen.addEventListener('mousemove', handleMouseMove);
+    screen.addEventListener('wheel', handleWheel);
+    screen.addEventListener('click', disableEvent);
+    screen.addEventListener('contextmenu', disableEvent);
 
-    // press button
-    async function handleMouseDown(event: any) {
-      disableEvent(event);
+    // Create touch handlers
+    const touchState = touchStateRef.current;
+    const touchHandlers = createTouchHandlers(touchState, {
+      scrollDirection,
+      scrollInterval,
+      getCoordinate,
+      handleMouseEvent,
+      disableEvent
+    });
 
-      switch (event.button) {
-        case 0:
-          keyRef.current.left = true;
-          break;
-        case 1:
-          keyRef.current.mid = true;
-          break;
-        case 2:
-          keyRef.current.right = true;
-          break;
-        default:
-          console.log(`unknown button ${event.button}`);
-          return;
-      }
-
-      await send(event);
+    // Add touch event listeners (only on big screens)
+    if (isBigScreen) {
+      screen.addEventListener('touchstart', touchHandlers.handleTouchStart);
+      screen.addEventListener('touchmove', touchHandlers.handleTouchMove);
+      screen.addEventListener('touchend', touchHandlers.handleTouchEnd);
+      screen.addEventListener('touchcancel', touchHandlers.handleTouchCancel);
     }
 
-    // release button
-    async function handleMouseUp(event: any) {
-      disableEvent(event);
-
-      switch (event.button) {
-        case 0:
-          keyRef.current.left = false;
-          break;
-        case 1:
-          keyRef.current.mid = false;
-          break;
-        case 2:
-          keyRef.current.right = false;
-          break;
-        default:
-          console.log(`unknown button ${event.button}`);
-          return;
-      }
-
-      await send(event);
+    // Mouse down event
+    function handleMouseDown(e: MouseEvent): void {
+      disableEvent(e);
+      handleMouseEvent({ type: 'mousedown', button: e.button });
     }
 
-    // mouse move
-    async function handleMouseMove(event: any) {
-      disableEvent(event);
-      await send(event);
-
-      // mouse jiggler record last move time
-      if (mouseJigglerMode === 'enable') {
-        setMouseLastMoveTime(Date.now());
-      }
+    // Mouse up event
+    function handleMouseUp(e: MouseEvent): void {
+      disableEvent(e);
+      handleMouseEvent({ type: 'mouseup', button: e.button });
     }
 
-    // mouse scroll
-    async function handleWheel(event: any) {
-      disableEvent(event);
+    // Mouse move event
+    function handleMouseMove(e: MouseEvent): void {
+      disableEvent(e);
+      const { x, y } = getCoordinate(e);
+      handleMouseEvent({ type: 'move', x, y });
+    }
+
+    // Mouse wheel event
+    function handleWheel(e: WheelEvent): void {
+      disableEvent(e);
+
+      if (Math.floor(e.deltaY) === 0) {
+        return;
+      }
 
       const currentTime = Date.now();
       if (currentTime - lastScrollTimeRef.current < scrollInterval) {
         return;
       }
 
-      const delta = Math.floor(event.deltaY);
-      if (delta === 0) return;
-
-      await send(event, delta > 0 ? -1 * scrollDirection : scrollDirection);
-
+      const deltaY = (e.deltaY > 0 ? 1 : -1) * scrollDirection;
+      handleMouseEvent({ type: 'wheel', deltaY });
       lastScrollTimeRef.current = currentTime;
     }
 
-    async function send(event: MouseEvent, scroll: number = 0) {
-      const rect = canvas!.getBoundingClientRect();
-      const x = Math.abs(event.clientX - rect.left);
-      const y = Math.abs(event.clientY - rect.top);
+    // Calculate mouse coordinate
+    function getCoordinate(event: { clientX: number; clientY: number }): { x: number; y: number } {
+      const rect = screen.getBoundingClientRect();
 
-      await device.sendMouseAbsoluteData(keyRef.current, rect.width, rect.height, x, y, scroll);
+      const clientX = event.clientX;
+      const clientY = event.clientY;
+
+      if (!screen.videoWidth || !screen.videoHeight) {
+        const x = (clientX - rect.left) / rect.width;
+        const y = (clientY - rect.top) / rect.height;
+        return { x, y };
+      }
+
+      const videoRatio = screen.videoWidth / screen.videoHeight;
+      const elementRatio = rect.width / rect.height;
+
+      let renderedWidth = rect.width;
+      let renderedHeight = rect.height;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (videoRatio > elementRatio) {
+        renderedHeight = rect.width / videoRatio;
+        offsetY = (rect.height - renderedHeight) / 2;
+      } else {
+        renderedWidth = rect.height * videoRatio;
+        offsetX = (rect.width - renderedWidth) / 2;
+      }
+
+      const x = (clientX - rect.left - offsetX) / renderedWidth;
+      const y = (clientY - rect.top - offsetY) / renderedHeight;
+      return { x, y };
     }
 
     return () => {
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('wheel', handleWheel);
-      canvas.removeEventListener('click', disableEvent);
-      canvas.removeEventListener('contextmenu', disableEvent);
-    };
-  }, [resolution, scrollDirection, scrollInterval, mouseJigglerMode, setMouseLastMoveTime]);
+      screen.removeEventListener('mousedown', handleMouseDown);
+      screen.removeEventListener('mouseup', handleMouseUp);
+      screen.removeEventListener('mousemove', handleMouseMove);
+      screen.removeEventListener('wheel', handleWheel);
+      screen.removeEventListener('click', disableEvent);
+      screen.removeEventListener('contextmenu', disableEvent);
+      screen.removeEventListener('touchstart', touchHandlers.handleTouchStart);
+      screen.removeEventListener('touchmove', touchHandlers.handleTouchMove);
+      screen.removeEventListener('touchend', touchHandlers.handleTouchEnd);
+      screen.removeEventListener('touchcancel', touchHandlers.handleTouchCancel);
 
-  // disable default events
-  function disableEvent(event: any) {
+      touchHandlers.cleanup();
+    };
+  }, [isBigScreen, scrollDirection, scrollInterval]);
+
+  // Mouse event handler
+  async function handleMouseEvent(event: MouseAbsoluteEvent): Promise<void> {
+    let report: number[];
+    const mouse = mouseRef.current;
+
+    switch (event.type) {
+      case 'mousedown':
+        mouse.buttonDown(event.button);
+        report = mouse.buildButtonReport(lastPosRef.current.x, lastPosRef.current.y);
+        break;
+      case 'mouseup':
+        mouse.buttonUp(event.button);
+        report = mouse.buildButtonReport(lastPosRef.current.x, lastPosRef.current.y);
+        break;
+      case 'wheel':
+        report = mouse.buildReport(lastPosRef.current.x, lastPosRef.current.y, event.deltaY);
+        break;
+      case 'move':
+        report = mouse.buildReport(event.x, event.y);
+        lastPosRef.current = { x: event.x, y: event.y };
+        break;
+      default:
+        report = mouse.buildReport(lastPosRef.current.x, lastPosRef.current.y);
+        break;
+    }
+
+    await device.sendMouseData([0x02, ...report]);
+
+    mouseJiggler.moveEventCallback();
+  }
+
+  // Disable default events
+  function disableEvent(event: Event): void {
     event.preventDefault();
     event.stopPropagation();
   }

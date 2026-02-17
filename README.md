@@ -1,49 +1,71 @@
 # NanoKVM-USB
-This is a modified version with enhanced support for **AZERTY (FR)** keyboards.
 
-## Fixes
-- AZERTY layout is now correctly handled
-- Special chars
-- Multiselect with **Ctrl + Click**
-- Copy/paste between host and target
+<div align="center">
 
-Use the installer in the **Releases** section.
+![NanoKVM-USB](https://wiki.sipeed.com/hardware/assets/NanoKVM/usb/NanoKVM-USB.png)
 
----
+</div>
 
-## Desktop version
-[Original Version](https://github.com/sipeed/NanoKVM-USB)
+> Finger-sized 4K USB KVM for Server/SBCs
 
-Download the installer from the **Releases** section.  
-Or use my version for enhanced handling of AZERTY keyboards.
+## Introduction
 
----
+The NanoKVM-USB is a convenient tool for operations and multi-device collaboration. It allows you to perform maintenance tasks without the need for a keyboard, mouse, or monitor. Using just a single computer and no additional software downloads, you can start graphical operations directly through the Chrome browser.
 
-## Web version
-https://usbkvm.sipeed.com/
+NanoKVM-USB captures HDMI video signals and transmits them to the host via USB 3.0. Unlike typical USB capture cards, NanoKVM-USB also captures keyboard and mouse input from the host and sends it to the target machine in real-time, eliminating the need for traditional screen and peripheral connections. It also supports HDMI loop-out, with a maximum resolution of 4K@30Hz, making it easy to connect to a large display.
 
----
+![wiring](https://wiki.sipeed.com/hardware/assets/NanoKVM/usb/wiring.png)
+<br>
 
-## Driver
-Google and install:  
-`ch340` driver
+## Technical Specifications
 
----
+| | NanoKVM-USB | Mini-KVM | KIWI-KVM |
+| --- | :---: | :---: | :---: |
+| HDMI Input | 4K@30fps / Pro 4K@60fps  | 1080P@60fps | 4K@30fps |
+| HDMI Loopout | 4K@30fps / Pro 4K@60fps | None | None |
+| USB Capture | 1080P@60fps / Pro 4K@60fps | 1080P@60fps | 1080P@60fps |
+| USB Interface | USB3.0 | USB2.0 | USB3.0 |
+| USB Switch | Yes | Yes | No |
+| Keyboard & Mouse | Yes | Yes | Yes |
+| Clipboard | Yes | Yes | Yes |
+| Software | No setup needed, works in Chrome | Host App required | Host App required |
+| Latency | 50-100ms | 50-100ms | 50-100ms |
+| Volume | 57x25x23mm | 61x13.5x53mm | 80x80x10mm |
+| Shell Material | Aluminum Alloy | Aluminum Alloy | Plastics |
+| Color | Black / Blue / Red | Black | Black |
+| Price | `$39.9/$49.9`, Pro `$59.9/$69.9` | `$89 / $109` | `$69 / $99` |
 
-## Schemas
+<br>
 
-### NanoKVM USB + Raspberry
-To command a Raspberry on your PC without SSH:  
-Raspberry --(USBA/USBC + HDMI)-- KVM  
-PC --(USBC)-- KVM  
+![interface](https://wiki.sipeed.com/hardware/assets/NanoKVM/usb/interface.jpg)
 
-### NanoKVM USB + Work PC
-To show your Work PC on your Personal PC:  
-Work PC --(USBA/USBC + HDMI)-- KVM  
-Personal PC --(USBC)-- KVM  
-=> Webcam/Keyboard/Mouse on the USB port and switched to Target  
+> **Note:** For the best experience, please use a USB 3.0 cable to connect the device.
 
-### NanoKVM USB + Dex Hub
-To use your Samsung phone on your Work PC:  
-S25 --(USBC)-- Dex Hub --(USBA/USBC + HDMI)-- KVM  
-Work PC --(USBC)-- KVM  
+## Resources
+
+We offer two versions of the application: [Browser](https://github.com/sipeed/NanoKVM-USB/tree/main/browser) and [Desktop](https://github.com/sipeed/NanoKVM-USB/tree/main/desktop). Both are available on the [Releases page](https://github.com/sipeed/NanoKVM-USB/releases).
+
+### Browser Version
+
+Access our online service at [usbkvm.sipeed.com](https://usbkvm.sipeed.com).
+
+For self-deployment, download the `NanoKVM-USB-xxx-browser.zip` and serve it. Refer to the [Deployment Guide](https://wiki.sipeed.com/hardware/en/kvm/NanoKVM_USB/development.html) for details. If you are using Docker, simply run `docker-compose up -d`.
+
+
+> Please use the desktop Chrome browser.
+
+### Desktop Version
+
+Download the appropriate package for your operating system and install it.
+
+> For Linux users, a permission error may occur when connecting to the serial port.  
+> To resolve this run the commands below matching your system, then log out and log back in or restart your system.
+> #### Debian
+> `sudo usermod -a -G dialout $USER`
+> #### Arch
+> `sudo usermod -a -G uucp $USER`
+## Where to Buy
+
+* [AliExpress Store]() (To be released)
+* [Taobao Store]() (To be released)
+* [Pre-sale Page](https://sipeed.com/nanokvm/usb)

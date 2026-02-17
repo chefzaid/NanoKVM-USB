@@ -23,6 +23,8 @@ const zh = {
     video: {
       resolution: '分辨率',
       scale: '缩放',
+      auto: '自动',
+      rotation: '旋转',
       customResolution: '自定义',
       device: '设备',
       custom: {
@@ -33,13 +35,25 @@ const zh = {
         cancel: '取消'
       }
     },
+    audio: {
+      tip: '提示',
+      permission:
+        '网页需要麦克风权限来获取 USB 设备的音频信号。因为电脑系统会将 USB 音频输入设备识别为麦克风，而非扬声器。\n\n此操作仅用于设备连接，不会录制任何声音。',
+      viewDoc: '查看文档。',
+      ok: '确定'
+    },
     keyboard: {
       paste: '粘贴',
       virtualKeyboard: '虚拟键盘',
-      shortcuts: '快捷键',
-      ctrlAltDel: 'Ctrl + Alt + Delete',
-      ctrlD: 'Ctrl + D',
-      winTab: 'Win + Tab',
+      shortcut: {
+        title: '快捷键',
+        custom: '自定义',
+        capture: '点击此处捕获快捷键',
+        clear: '清空',
+        save: '保存',
+        captureTips: '捕获系统级按键（如 Windows 键）需要全屏权限。',
+        enterFullScreen: '切换全屏模式。'
+      }
     },
     mouse: {
       cursor: {
@@ -60,7 +74,7 @@ const zh = {
       slow: '慢',
       requestPointer: '正在使用鼠标相对模式，请点击桌面获取鼠标指针。',
       jiggler: {
-        title: '闲时晃动',
+        title: '空闲晃动',
         enable: '启用',
         disable: '禁用'
       }
