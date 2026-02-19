@@ -44,7 +44,6 @@ export const Paste = (): ReactElement => {
         }
 
         await send(modifier, code)
-        await new Promise((r) => setTimeout(r, 100))
         await send(0, 0)
       }
 
